@@ -56,3 +56,38 @@ MatinFowler提出）又称为失血模型，是指domain object仅有属性的ge
 2. 多用组合少用继承。(即：组合优于继承)
    1. 继承存在的问题：
       1. 继承层次过深、继承关系过于复杂会影响到代码的可读性和可维护性。
+      2. 如果过度使用组合，以为着要做更细粒度的类的拆分，就要定义更多的类和接口。类和接口的增多也就或多或少地增加代码的复杂程度和维护成本。
+   2. 如何判断改用组合还是继承：
+      1. 如果类之间的继承结构稳定（不轻易改变），继承层次比较浅，继承关系不复杂，此时应当推荐使用继承。
+      2. 如果系统接口不稳定，继承层次很深，继承关系复杂，此时应当推荐使用组合。
+
+
+
+
+### 备注
+- 委托：
+```java
+
+public interface Flyable {
+  void fly()；
+}
+public class FlyAbility implements Flyable {
+  @Override
+  public void fly() { //... }
+}
+//省略Tweetable/TweetAbility/EggLayable/EggLayAbility
+
+public class Ostrich implements Tweetable, EggLayable {//鸵鸟
+  private TweetAbility tweetAbility = new TweetAbility(); //组合
+  private EggLayAbility eggLayAbility = new EggLayAbility(); //组合
+  //... 省略其他属性和方法...
+  @Override
+  public void tweet() {
+    tweetAbility.tweet(); // 委托
+  }
+  @Override
+  public void layEgg() {
+    eggLayAbility.layEgg(); // 委托
+  }
+}
+```
