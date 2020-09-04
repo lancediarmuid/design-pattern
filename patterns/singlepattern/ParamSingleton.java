@@ -11,15 +11,19 @@ public class ParamSingleton {
     private final String paramA;
     private final String paramB;
 
-    private ParamSingleton(){
+    private ParamSingleton() {
         this.paramA = Config.PARAM_A;
         this.paramB = Config.PARAM_B;
     }
 
-    public synchronized static ParamSingleton getInstance(){
-        if (paramSingleton == null){
+    public synchronized static ParamSingleton getInstance() {
+        if (paramSingleton == null) {
             paramSingleton = new ParamSingleton();
         }
         return paramSingleton;
+    }
+
+    public String func() {
+        return this.paramA + this.paramB;
     }
 }
