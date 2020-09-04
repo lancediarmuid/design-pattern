@@ -8,7 +8,7 @@ public class DoubleCheckSingleton {
 
     private DoubleCheckSingleton(){}
 
-    private static DoubleCheckSingleton doubleCheckSingleton;
+    private static volatile DoubleCheckSingleton doubleCheckSingleton;
 
 
     public static DoubleCheckSingleton getInstance(){
