@@ -321,11 +321,239 @@ public class XmlConfigParserFactory implements IConfigParserFactory {
 ## 为什么没事不要随便用工厂模式创建对象
 
 
+## 工厂模式和依赖注入容器
+### 区别
+1. 工厂模式中，一个工厂类只负责某个类对象或者某一组相关类对象（继承自同一抽象类或者接口的子类）的创建；
+2. DI 容器负责的是整个应用中所有类对象的创建；
+3. DI 容器还需要负责配置类的解析、对象声明周期的管理；
+
+### DI 容器的核心功能
+#### 1. 配置解析
+- 背景：
+  - 在工厂模式中，工厂类要创建哪个类对象是事先确定好的，并且是写死在工厂类代码中的。作为一个通用的框架来说， **框架代码跟应用代码应该是高度解耦的，DI 容器事先并不知道应用会创建哪些对象** ，不可能把某个应用要创建的对象写死在框架代码中。
+  - 所以，我们需要通过一种形式，让应用告知 DI 容器要创建哪些对象。
+- 做法：
+  - 将需要由 DI 容器来创建的类对象和创建类对象的必要信息，放到配置文件中。
+  - 容器读取配置文件，根据配置文件提供的信息来创建对象。
+- 举例：
+  - Spring 容器的配置文件，定义 beans 的依赖关系以及位置
+
+#### 2. 对象创建
+- 背景：
+  - 在 DI 容器中国，如果我们给每个类都创建一个工厂列，那项目中类的个数会成倍增加，这回增加代码的维护成本；
+- 做法：
+  - 将所有类对象的创建放到一个工厂类中完成。
+- 举例：
+  - Spring 容器中的 BeansFactory。
+
+#### 3. 对象声明周期管理
+- 背景：
+  - 简单工厂模式有两种实现方式：一种是每次都返回新创建的对象，另一种是每次都返回同一个事先创建好的对象，也就是所谓的单例对象。
+- 做法：
+  - 在 Spring 框架中，我们可以通过配置 scope 属性，来区分这两种不同类型的对象。`scope=prototype` 表示返回新创建的对象，`scope=singleton` 表示返回单例对象，默认返回单例；
+  - Spring 框架中，可以配置对象是否支持懒加载。如果 `lazy-init=true`，对象在真正被使用到的时候才被创建；如果 `lazy-init=false`，对象在应用启动的时候就事先创建好。
+  - 配置对象的 `init-method` 和 `destroy-method` 方法，如： `init-method=loadProperties()`，`destroy-method=updateConfigFile()`。
+    - 在 DI 容器在创建好对象之后，会主动调用 `init-method` 属性指定的方法来初始化对象。
+    - 在对象被最终销毁之前，DI 容器会主动调用 `destroy-method` 属性指定的方法来做一些清理工作，比如释放数据库连接池、关闭文件。
+
+## 实现一个简单的 DI 容器
+- 核心逻辑： 
+  - 配置文件解析
+  - 根据配置文件通过 **反射** 语法来创建对象
+
+### 1. 最小原型设计
+- 在最小原型设置中，配置文件中支持的配置语法仅限配置 `beans>bean.id.class.scope.lazy-init>constructor-arg.type.value.ref`
+- 使用示例：
+```java
+public class Demo {
+  public static void main(String[] args) {
+    ApplicationContext applicationContext = new ClassPathXmlApplicationContext(
+            "beans.xml");
+    RateLimiter rateLimiter = (RateLimiter) applicationContext.getBean("rateLimiter");
+    rateLimiter.test();
+    //...
+  }
+}
+```
+
+### 2. 提供执行入口
+```java
+public interface ApplicationContext {
+  Object getBean(String beanId);
+}
+
+public class ClassPathXmlApplicationContext implements ApplicationContext {
+  private BeansFactory beansFactory;
+  private BeanConfigParser beanConfigParser;
+
+  public ClassPathXmlApplicationContext(String configLocation) {
+    this.beansFactory = new BeansFactory();
+    this.beanConfigParser = new XmlBeanConfigParser();
+    loadBeanDefinitions(configLocation);
+  }
+
+  private void loadBeanDefinitions(String configLocation) {
+    InputStream in = null;
+    try {
+      in = this.getClass().getResourceAsStream("/" + configLocation);
+      if (in == null) {
+        throw new RuntimeException("Can not find config file: " + configLocation);
+      }
+      List<BeanDefinition> beanDefinitions = beanConfigParser.parse(in);
+      beansFactory.addBeanDefinitions(beanDefinitions);
+    } finally {
+      if (in != null) {
+        try {
+          in.close();
+        } catch (IOException e) {
+          // TODO: log error
+        }
+      }
+    }
+  }
+
+  @Override
+  public Object getBean(String beanId) {
+    return beansFactory.getBean(beanId);
+  }
+}
+```
+
+- ClassPathXmlApplicationContext 负责组装 BeansFactory 和 BeanConfigParser 两个类；
+- 执行流程：
+  - 从 classpath 中加载 XML 格式的配置文件，通过 BeanCofigParser 解析为统一的 BeanDefinition 格式；
+  - 然后，BeansFactory 根据 BeanDefinition 来创建对象；
+
+### 3. 配置文件解析
+- 配置文件解析主要包含 BeanConfigParser 接口和 XmlBeanConfigParser 实现类，负责将配置文件解析为 BeanDefinition 结构，以便 BeansFactory 根据这个结构来创建对象。
+```java
+public interface BeanConfigParser {
+  List<BeanDefinition> parse(InputStream inputStream);
+  List<BeanDefinition> parse(String configContent);
+}
+
+public class XmlBeanConfigParser implements BeanConfigParser {
+
+  @Override
+  public List<BeanDefinition> parse(InputStream inputStream) {
+    String content = null;
+    // TODO:...
+    return parse(content);
+  }
+
+  @Override
+  public List<BeanDefinition> parse(String configContent) {
+    List<BeanDefinition> beanDefinitions = new ArrayList<>();
+    // TODO:...
+    return beanDefinitions;
+  }
+
+}
+
+public class BeanDefinition {
+  private String id;
+  private String className;
+  private List<ConstructorArg> constructorArgs = new ArrayList<>();
+  private Scope scope = Scope.SINGLETON;
+  private boolean lazyInit = false;
+  // 省略必要的getter/setter/constructors
+ 
+  public boolean isSingleton() {
+    return scope.equals(Scope.SINGLETON);
+  }
 
 
+  public static enum Scope {
+    SINGLETON,
+    PROTOTYPE
+  }
+  
+  public static class ConstructorArg {
+    private boolean isRef;
+    private Class type;
+    private Object arg;
+    // 省略必要的getter/setter/constructors
+  }
+}
+```
+
+### 4. 核心工厂类设计
+- BeansFactory 根据从配置文件解析得到的 BeanDefinition 来创建对象。
+- 如果对象的 scope 属性是 singleton，那对象创建之后会缓存在 singletonObjects 这样一个 map 中，下次再请求此对象的时候，直接从 map 中取出返回，不需要重新创建。
+- 如果对象的 scope 属性是 prototype，那每次请求对象，BeansFactory 都会创建一个新的对象返回。
+- **BeansFactory 创建对象用到的主要技术点是 Java 中的反射语法。**
+- 代码示例： 
+```java
+public class BeansFactory {
+  private ConcurrentHashMap<String, Object> singletonObjects = new ConcurrentHashMap<>();
+  private ConcurrentHashMap<String, BeanDefinition> beanDefinitions = new ConcurrentHashMap<>();
+
+  public void addBeanDefinitions(List<BeanDefinition> beanDefinitionList) {
+    for (BeanDefinition beanDefinition : beanDefinitionList) {
+      this.beanDefinitions.putIfAbsent(beanDefinition.getId(), beanDefinition);
+    }
+
+    for (BeanDefinition beanDefinition : beanDefinitionList) {
+      if (beanDefinition.isLazyInit() == false && beanDefinition.isSingleton()) {
+        createBean(beanDefinition);
+      }
+    }
+  }
+
+  public Object getBean(String beanId) {
+    BeanDefinition beanDefinition = beanDefinitions.get(beanId);
+    if (beanDefinition == null) {
+      throw new NoSuchBeanDefinitionException("Bean is not defined: " + beanId);
+    }
+    return createBean(beanDefinition);
+  }
+
+  @VisibleForTesting
+  protected Object createBean(BeanDefinition beanDefinition) {
+    if (beanDefinition.isSingleton() && singletonObjects.contains(beanDefinition.getId())) {
+      return singletonObjects.get(beanDefinition.getId());
+    }
+
+    Object bean = null;
+    try {
+      Class beanClass = Class.forName(beanDefinition.getClassName());
+      List<BeanDefinition.ConstructorArg> args = beanDefinition.getConstructorArgs();
+      if (args.isEmpty()) {
+        bean = beanClass.newInstance();
+      } else {
+        Class[] argClasses = new Class[args.size()];
+        Object[] argObjects = new Object[args.size()];
+        for (int i = 0; i < args.size(); ++i) {
+          BeanDefinition.ConstructorArg arg = args.get(i);
+          if (!arg.getIsRef()) {
+            argClasses[i] = arg.getType();
+            argObjects[i] = arg.getArg();
+          } else {
+            BeanDefinition refBeanDefinition = beanDefinitions.get(arg.getArg());
+            if (refBeanDefinition == null) {
+              throw new NoSuchBeanDefinitionException("Bean is not defined: " + arg.getArg());
+            }
+            argClasses[i] = Class.forName(refBeanDefinition.getClassName());
+            argObjects[i] = createBean(refBeanDefinition);
+          }
+        }
+        bean = beanClass.getConstructor(argClasses).newInstance(argObjects);
+      }
+    } catch (ClassNotFoundException | IllegalAccessException
+            | InstantiationException | NoSuchMethodException | InvocationTargetException e) {
+      throw new BeanCreationFailureException("", e);
+    }
+
+    if (bean != null && beanDefinition.isSingleton()) {
+      singletonObjects.putIfAbsent(beanDefinition.getId(), bean);
+      return singletonObjects.get(beanDefinition.getId());
+    }
+    return bean;
+  }
+}
+```
 
 
-
-
-
-
+## 思考题
+> BeansFactory 类中的 createBean() 函数是一个递归函数。当构造函数的参数是 ref 类型时，会递归地创建 ref 属性指向的对象。如果我们在配置文件中错误地配置了对象之间的依赖关系，导致存在循环依赖，那 BeansFactory 的 createBean() 函数是否会出现堆栈溢出？又该如何解决这个问题呢？
+- demo 位于当前目录下的 `dependencycircle` 目录下
