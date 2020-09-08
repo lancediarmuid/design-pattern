@@ -37,7 +37,7 @@ Spring 会抛出 **BeanCurrentlyInCreationException**
 我们先从加载 bean 最初始的方法 AbstractBeanFactory 的 `#doGetBean(final Stirng name, final Class<T> requiredType, final Object[] args, boolean typeCheckOnly)` 方法开始。
 </br>
 
-在 #doGetBean(...) 方法中，首先会根据 beanName 从单例 bean 缓存中获取，**如果不为空则直接返回。** 代码如下：
+在 `#doGetBean(...)` 方法中，首先会根据 beanName 从单例 bean 缓存中获取，**如果不为空则直接返回。** 代码如下：
 ```java
 // AbstractBeanFactory.java
 
@@ -126,7 +126,7 @@ private final Map<String, Object> earlySingletonObjects = new HashMap<>(16);
 
 这里，我们已经通过 `#getSingleton(String beanName, boolean allowEarlyReference)` 方法，看到他们是如何配合的。详细分析方法之前，提下其中的 `#isSingletonCurrentlyInCreation(String beanName)` 方法和 `allowEarlyReference` 变量：
 - `#isSingletonCurrentlyInCreation(String beanName)` 方法：判断当前 singleton bean 是否处于创建中。bean 处于创建中，也就是说 bean 在初始化但是没有完成初始化，有一个这样的过程其实和 Spring 解决 bean 循环依赖的理念相辅相成。**因为 Spring 解决 singleton bean 的核心就在于提前曝光 bean。**
-- allowEarlyReference 变量：从字面上面理解就是允许提前拿到引用。其实真正的意思是，是否允许从 singletonFactories 缓存中通过 #getObject() 方法，拿到对象。为什么会有这样一个字段呢？**原因就在于 singletonFactories 才是 Spring 解决 singleton bean 的诀窍所在。**
+- allowEarlyReference 变量：从字面上面理解就是允许提前拿到引用。其实真正的意思是，是否允许从 singletonFactories 缓存中通过 `#getObject()` 方法，拿到对象。为什么会有这样一个字段呢？**原因就在于 singletonFactories 才是 Spring 解决 singleton bean 的诀窍所在。**
 
 `#getSingleton(String beanName, boolean allowEarlyReference)` 方法，整个过程如下：
 - 首先，从一级缓存 `singletonObjects` 获取。
