@@ -10,6 +10,8 @@ import java.util.Map;
  * 简单工厂
  * 背景设定：
  *     附件的CURD，根据不同的业务类型分别创建不同的业务类型附件对象
+ *
+ * 简单工厂，将所有类的创建逻辑都放在了一起
  */
 public class SimpleAttachmentFactory {
 
