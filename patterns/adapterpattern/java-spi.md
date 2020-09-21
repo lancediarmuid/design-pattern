@@ -1,6 +1,6 @@
 ## SPI 是什么
 SPI 全程 Service Provider Interface，是 Java 提供的一套用来被第三方实现或者扩展的 API，它可以用来启用框架扩展和替换组件。
-![](pic/Java-SPI机制.png)
+![](./pic/Java-SPI机制.png)
 
 
 Java SPI 实际上是“ **基于接口的编程+配置文件** ”组合实现的动态加载机制。
